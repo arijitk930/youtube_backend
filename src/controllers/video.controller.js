@@ -4,7 +4,10 @@ import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+  deleteFromCloudinary,
+  uploadOnCloudinary,
+} from "../utils/cloudinary.js";
 import { validateMongoId } from "../utils/validateMongoId.js";
 
 const getAllVideos = asyncHandler(async (req, res) => {
@@ -150,7 +153,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
   const thumbnailLocalPath = req.files?.thumbnail?.[0].path;
 
   if (!videoLocalPath || !thumbnailLocalPath) {
-    throw new ApiError(400, "Both video and thumbnail fields aare required");
+    throw new ApiError(400, "Both video and thumbnail fields are required");
   }
 
   const uploadedVideo = await uploadOnCloudinary(videoLocalPath);
@@ -162,9 +165,9 @@ const publishAVideo = asyncHandler(async (req, res) => {
 
   const video = await Video.create({
     videoFile: uploadedVideo.url,
-    videoFilePublicField: uploadedVideo.public_id,
+    videoFilePublicId: uploadedVideo.public_id,
     thumbnail: uploadedThumbnail.url,
-    thumbnailPublicField: uploadedThumbnail.public_id,
+    thumbnailPublicId: uploadedThumbnail.public_id,
     title,
     description,
     duration: uploadedVideo.duration,
@@ -225,17 +228,111 @@ const getVideoById = asyncHandler(async (req, res) => {
 });
 
 const updateVideo = asyncHandler(async (req, res) => {
-  const { videoId } = req.params;
   //TODO: update video details like title, description, thumbnail
+  const { videoId } = req.params;
+  validateMongoId(videoId, "Video ID");
+
+  const oldVideo = await Video.findById(videoId);
+
+  if (!oldVideo) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  if (!oldVideo.owner.equals(req.user._id)) {
+    throw new ApiError(403, "You are not authorized to update this video");
+  }
+
+  const { title, description } = req.body;
+
+  if (!title || !description) {
+    throw new ApiError(400, "All fields are required");
+  }
+
+  const thumbnailLocalPath = req.file?.path;
+
+  if (!thumbnailLocalPath) {
+    throw new ApiError(400, "Thumbnail is missing");
+  }
+
+  const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
+
+  if (!thumbnail?.url) {
+    throw new ApiError(400, "Error while uploading thumbnail");
+  }
+
+  // Update video document in database with new data
+  const video = await Video.findByIdAndUpdate(
+    videoId,
+    {
+      $set: {
+        title,
+        description,
+        thumbnail: thumbnail.url,
+        thumbnailPublicId: thumbnail.public_id,
+      },
+    },
+    {
+      new: true,
+    }
+  );
+
+  if (!video) {
+    await deleteFromCloudinary(thumbnail.public_id);
+    throw new ApiError(500, "Failed to update video");
+  }
+
+  await deleteFromCloudinary(oldVideo.thumbnailPublicId);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, video, "Video updated successfully"));
 });
 
 const deleteVideo = asyncHandler(async (req, res) => {
-  const { videoId } = req.params;
   //TODO: delete video
+  const { videoId } = req.params;
+  validateMongoId(videoId, "Video ID");
+
+  const video = await Video.findById(videoId);
+
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  await Video.findByIdAndDelete(videoId);
+
+  await deleteFromCloudinary(videoFilePublicId);
+  await deleteFromCloudinary(thumbnailPublicId);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Video deleted successfully"));
 });
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
+  validateMongoId(videoId, "Video ID");
+
+  const video = await Video.findById(videoId);
+
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  if (!video.owner.equals(req.user?._id)) {
+    throw new ApiError(403, "You are not authorized to delete this video");
+  }
+
+  video.isPublished = !video.isPublished;
+  await video.Save();
+
+  return res
+    .status(200)
+    .json(
+      200,
+      video,
+      `Video ${video.isPublished ? "published" : "unpublished"} successfully`
+    );
 });
 
 export {

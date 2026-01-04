@@ -138,13 +138,90 @@ const getAllVideos = asyncHandler(async (req, res) => {
 });
 
 const publishAVideo = asyncHandler(async (req, res) => {
-  const { title, description } = req.body;
   // TODO: get video, upload to cloudinary, create video
+  const { title, description } = req.body; // Extract title and description from request body
+
+  // Validate that both title and description are provided
+  if (!title || !description) {
+    throw new ApiError(400, "All fields are required");
+  }
+
+  const videoLocalPath = req.files?.videoFile?.[0]?.path;
+  const thumbnailLocalPath = req.files?.thumbnail?.[0].path;
+
+  if (!videoLocalPath || !thumbnailLocalPath) {
+    throw new ApiError(400, "Both video and thumbnail fields aare required");
+  }
+
+  const uploadedVideo = await uploadOnCloudinary(videoLocalPath);
+  const uploadedThumbnail = await uploadOnCloudinary(thumbnailLocalPath);
+
+  if (!uploadedVideo.url || !uploadedThumbnail.url) {
+    throw new ApiError(400, "Error whle uploading");
+  }
+
+  const video = await Video.create({
+    videoFile: uploadedVideo.url,
+    videoFilePublicField: uploadedVideo.public_id,
+    thumbnail: uploadedThumbnail.url,
+    thumbnailPublicField: uploadedThumbnail.public_id,
+    title,
+    description,
+    duration: uploadedVideo.duration,
+    owner: req.user?._id,
+  });
+
+  if (!video) {
+    throw new ApiError(500, "Failed to publish");
+  }
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, video, "Video published successfully"));
 });
 
 const getVideoById = asyncHandler(async (req, res) => {
-  const { videoId } = req.params;
   //TODO: get video by id
+  const { videoId } = req.params; // Extract videoId from URL parameters (e.g., /videos/:videoId)
+
+  validateMongoId(videoId, "Video ID"); // Validate videoId format and existence in req.params before proceeding
+
+  // Find the video AND increment its view count in one operation. This is more efficient than separate find and update operations
+  const video = await Video.findOneAndUpdate(
+    {
+      _id: videoId,
+      isPublished: true,
+    },
+    {
+      $inc: { views: 1 },
+    },
+    {
+      new: true,
+      runValidators: true,
+    }
+  )
+
+    // Join with users collection to get owner details. 'owner' is the field to populate. fullName username avatar' are the specific fields we want from the user
+    .populate("owner", "fullName username avatar")
+
+    // Select only specific fields to return. This limits the data sent to the client (better performance & security). Not sending unnecessary fields like internal timestamps, etc.
+    .select(
+      "videoFile thumbnail title description duration views isPublished owner"
+    );
+
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  if (req.user) {
+    User.findByIdAndUpdate(req.user._id, {
+      $addToSet: { watchHistory: videoId }, // $addToSet adds videoId to watchHistory array only if it's not already there (prevents duplicates)
+    });
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, video, "Video fetched successfuly"));
 });
 
 const updateVideo = asyncHandler(async (req, res) => {

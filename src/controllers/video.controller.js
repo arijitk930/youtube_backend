@@ -326,14 +326,16 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
   }
 
   video.isPublished = !video.isPublished;
-  await video.Save();
+  await video.save();
 
   return res
     .status(200)
     .json(
-      200,
-      video,
-      `Video ${video.isPublished ? "published" : "unpublished"} successfully`
+      ApiResponse(
+        200,
+        video,
+        `Video ${video.isPublished ? "published" : "unpublished"} successfully`
+      )
     );
 });
 

@@ -9,6 +9,7 @@ import {
 } from "../controllers/video.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
+import { optionalAuth } from "../middlewares/optionalAuth.middleware.js";
 
 const router = Router();
 
@@ -20,7 +21,7 @@ const router = Router();
 router.route("/").get(getAllVideos);
 
 // Watch video (public)
-router.route("/:videoId").get(getVideoById);
+router.route("/:videoId").get(optionalAuth, getVideoById);
 
 /* =======================
    PROTECTED ROUTES

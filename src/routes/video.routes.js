@@ -6,6 +6,7 @@ import {
   publishAVideo,
   togglePublishStatus,
   updateVideo,
+  incrementVideoView,
 } from "../controllers/video.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
@@ -21,6 +22,7 @@ const router = Router();
 router.route("/").get(getAllVideos);
 
 // Watch video (public)
+router.post("/:videoId/view", incrementVideoView);
 router.route("/:videoId").get(optionalAuth, getVideoById);
 
 /* =======================

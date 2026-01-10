@@ -186,6 +186,18 @@ const publishAVideo = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, video, "Video published successfully"));
 });
 
+const incrementVideoView = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+
+  validateMongoId(videoId, "Video ID");
+
+  await Video.findByIdAndUpdate(videoId, {
+    $inc: { views: 1 },
+  });
+
+  return res.status(200).json(new ApiResponse(200, {}, "View incremented"));
+});
+
 /* const getVideoById = asyncHandler(async (req, res) => {
   //TODO: get video by id
   const { videoId } = req.params; // Extract videoId from URL parameters (e.g., /videos/:videoId)
@@ -235,13 +247,12 @@ const getVideoById = asyncHandler(async (req, res) => {
 
   validateMongoId(videoId, "Video ID");
 
-  const video = await Video.findOneAndUpdate(
-    { _id: videoId, isPublished: true },
-    { $inc: { views: 1 } },
-    { new: true }
-  )
+  const video = await Video.findOne({
+    _id: videoId,
+    isPublished: true,
+  })
     .populate("owner", "fullName username avatar")
-    .lean(); // 👈 IMPORTANT
+    .lean();
 
   if (!video) {
     throw new ApiError(404, "Video not found");
@@ -387,4 +398,5 @@ export {
   updateVideo,
   deleteVideo,
   togglePublishStatus,
+  incrementVideoView,
 };

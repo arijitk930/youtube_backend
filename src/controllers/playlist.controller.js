@@ -45,7 +45,7 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
     createdAt: -1,
   });
 
-  if (!playlist) {
+  if (playlist.length === 0) {
     return res
       .status(200)
       .json(new ApiResponse(200, playlist, "No playlist found."));
@@ -105,12 +105,12 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
   const updatedPlaylist = await Playlist.findByIdAndUpdate(
     playlistId,
     {
-      $addToSet: { video: videoId },
+      $addToSet: { videos: videoId },
     },
     { new: true }
   );
 
-  if (!updatePlaylist) {
+  if (!updatedPlaylist) {
     throw new ApiError(500, "Failed to add the video");
   }
 
@@ -119,7 +119,7 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
     .json(
       new ApiResponse(
         200,
-        updatePlaylist,
+        updatedPlaylist,
         "Video added to playlist successfully"
       )
     );
@@ -151,7 +151,7 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
   const updatedPlaylist = await Playlist.findByIdAndUpdate(
     playlistId,
     {
-      $pull: { video: videoId },
+      $pull: { videos: videoId },
     },
     { new: true }
   );
@@ -177,6 +177,10 @@ const deletePlaylist = asyncHandler(async (req, res) => {
 
   if (!playlist) {
     throw new ApiError(404, "Playlist not found");
+  }
+
+  if (!playlist.owner.equals(req.user._id)) {
+    throw new ApiError(403, "Not authorized to delete this playlist");
   }
 
   await playlist.deleteOne();

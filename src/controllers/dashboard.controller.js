@@ -22,7 +22,7 @@ const getChannelStats = asyncHandler(async (req, res) => {
 
       $lookup: {
         from: "likes",
-        localField: _id,
+        localField: "_id",
         foreignField: "video",
         as: "likes",
         pipeline: [
@@ -54,6 +54,12 @@ const getChannelStats = asyncHandler(async (req, res) => {
     totalLikes: stats[0]?.totalLikes || 0, // Default to 0 if no likes
     totalSubscribers, // Already returns 0 if no subscribers
   };
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, channelStats, "Channel stats fetched successfully")
+    );
 });
 
 const getChannelVideos = asyncHandler(async (req, res) => {

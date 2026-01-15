@@ -1,22 +1,28 @@
 import { Router } from "express";
 import {
-  getSubscribedChannels,
-  getUserChannelSubscribers,
-  isSubscribed,
   toggleSubscription,
+  getUserChannelSubscribers,
+  getSubscribedChannels,
+  isSubscribed,
+  getChannelSubscriberCount,
 } from "../controllers/subscription.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 
 const router = Router();
-router.use(verifyJWT); // Apply verifyJWT middleware to all routes in this file
 
-router
-  .route("/c/:channelId")
-  .get(getUserChannelSubscribers)
-  .post(toggleSubscription);
+// Public: get subscriber COUNT (used on channel page, video page)
+router.get("/count/:channelId", getChannelSubscriberCount);
 
-router.route("/u/:subscriberId").get(getSubscribedChannels);
+// Subscribe / Unsubscribe a channel
+router.post("/toggle/:channelId", verifyJWT, toggleSubscription);
 
-router.route("/is-subscribed/:channelId").get(isSubscribed);
+// Check if logged-in user is subscribed to a channel
+router.get("/is-subscribed/:channelId", verifyJWT, isSubscribed);
+
+// Get list of channels a user has subscribed to (MY subscriptions)
+router.get("/u/:subscriberId", verifyJWT, getSubscribedChannels);
+
+// Get subscriber LIST of a channel (OWNER ONLY – My Channel → Subscribers tab)
+router.get("/subscribers/:channelId", verifyJWT, getUserChannelSubscribers);
 
 export default router;

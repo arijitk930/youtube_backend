@@ -70,10 +70,29 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(
+      new ApiResponse(200, { subscribers }, "Subscribers fetched successfully")
+    );
+});
+
+const getChannelSubscriberCount = asyncHandler(async (req, res) => {
+  const { channelId } = req.params;
+
+  validateMongoId(channelId, "Channel ID");
+
+  const channelExists = await User.exists({ _id: channelId });
+  if (!channelExists) {
+    throw new ApiError(404, "Channel not found");
+  }
+
+  const count = await Subscription.countDocuments({ channel: channelId });
+
+  return res
+    .status(200)
+    .json(
       new ApiResponse(
         200,
-        { totalSubscribers: subscribers.length, subscribers },
-        "Subscribers fetched successfully"
+        { totalSubscribers: count },
+        "Subscriber count fetched successfully"
       )
     );
 });
@@ -136,4 +155,5 @@ export {
   getUserChannelSubscribers,
   getSubscribedChannels,
   isSubscribed,
+  getChannelSubscriberCount,
 };
